@@ -9,23 +9,3 @@ body {
   justify-content: center;
   height: 100vh;
 }
-
-h3 {
-  margin-bottom: 4rem;
-}
-
-.rotating-box {
-  width: 100px;
-  height: 100px;
-  background-color: #10a37f;
-  animation: rotate 3s linear infinite;
-}
-
-@keyframes rotate {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
-}
