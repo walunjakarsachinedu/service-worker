@@ -1,6 +1,4 @@
-// registering onclick handler
-const storeBtn = document.getElementById("store-btn");
-storeBtn.onclick = () => sendMsgToServiceWorker("store-data");
+const networkStatus = document.getElementById("network-status");
 
 // registering service worker
 if ("serviceWorker" in navigator) {
@@ -9,8 +7,22 @@ if ("serviceWorker" in navigator) {
     .then(() => console.log("Service Worker registered."));
 }
 
-window.addEventListener("online", () => sendMsgToServiceWorker("online"));
-window.addEventListener("offline", () => sendMsgToServiceWorker("offline"));
+
+
+handleNetworkStatus();
+window.addEventListener("online", () => handleNetworkStatus());
+window.addEventListener("offline", () => handleNetworkStatus());
+
+function handleNetworkStatus() {
+  if(navigator.onLine) {
+    networkStatus.textContent = ""; 
+    sendMsgToServiceWorker("online")
+  }
+  else {
+    networkStatus.textContent = "you are seeing cached offline content"; 
+    sendMsgToServiceWorker("offline")
+  }
+}
 
 function sendMsgToServiceWorker(msgType) {
   if (!("serviceWorker" in navigator)) return;
