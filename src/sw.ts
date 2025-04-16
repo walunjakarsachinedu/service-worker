@@ -3,21 +3,21 @@ const dbVersion = 1;
 const objStoreName = "ui-assets";
 let isOnline = true;
 
-let db = new Promise((resolve, reject) => {
+let db: Promise<IDBDatabase> = new Promise((resolve, reject) => {
   const request = indexedDB.open(dbName, dbVersion);
-  request.onupgradeneeded = (e) => {
-    const db = e.target.result;
-    db.createObjectStore(objStoreName, {
-      keyPath: "id",
-    });
+
+  request.onupgradeneeded = (e: IDBVersionChangeEvent) => {
+    const db = (e.target as IDBRequest)?.result as IDBDatabase;
+    db.createObjectStore(objStoreName, { keyPath: "id" });
   };
-  request.onsuccess = (e) => resolve(e.target.result);
-  request.onerror = (e) => reject(e.target.error);
+
+  request.onsuccess = (e: Event) => resolve((e.target as IDBRequest).result as IDBDatabase);
+  request.onerror = (e: Event) => reject((e.target as IDBRequest).error);
 });
 
-db.catch((err) => console.error("error while opening database", err));
+db.catch((err) => console.error("Error while opening database", err));
 
-const mimeMap = {
+const mimeMap: Record<string, string> = {
   ".html": "text/html",
   ".js": "application/javascript",
   ".css": "text/css",
@@ -37,7 +37,12 @@ const mimeMap = {
   ".txt": "text/plain",
 };
 
-async function storeContent(id, content) {
+interface StoreContentParams {
+  id: string;
+  content: string;
+}
+
+async function storeContent({ id, content }: StoreContentParams): Promise<void> {
   const dbInstance = await db.catch(() => null);
   if (!dbInstance) return;
 
@@ -46,13 +51,13 @@ async function storeContent(id, content) {
   store.put({ id, content });
 }
 
-function isRootPath(path) {
+function isRootPath(path: string): boolean {
   if (!path) return false;
   const regex = /^https?:\/\/[^/]+\/?$/;
   return regex.test(path);
 }
 
-function extractFilenameFromUrl(url) {
+function extractFilenameFromUrl(url: string): string | null {
   if (!url) return null;
   if (isRootPath(url)) return "index.html";
 
@@ -61,27 +66,32 @@ function extractFilenameFromUrl(url) {
   return match?.[1] ?? null;
 }
 
-async function fetchAndCache(request) {
+async function fetchAndCache(request: Request): Promise<Response> {
   console.log("exec fetchAndCache for ", request.url);
   const fileName = extractFilenameFromUrl(request.url);
   const response = await fetch(request);
+
   if (fileName) {
     const cloned = response.clone();
     const content = await cloned.text();
-    await storeContent(fileName, content);
+    await storeContent({ id: fileName, content });
   }
+
   return response;
 }
 
-async function getOfflineResponse(request) {
+async function getOfflineResponse(request: Request): Promise<Response> {
   console.log("exec getOfflineResponse for ", request.url);
   const fileName = extractFilenameFromUrl(request.url);
+
+  if (!fileName) return new Response("Invalid URL", { status: 400 });
+
   const dbInstance = await db.catch(() => null);
   if (!dbInstance) return new Response("Failed to connect to database", { status: 503 });
 
   const tx = dbInstance.transaction([objStoreName], "readonly");
   const store = tx.objectStore(objStoreName);
-  const stored = await new Promise((resolve) => {
+  const stored = await new Promise<string | null>((resolve) => {
     const req = store.get(fileName);
     req.onsuccess = () => resolve(req.result?.content ?? null);
     req.onerror = () => resolve(null);
@@ -97,16 +107,18 @@ async function getOfflineResponse(request) {
   });
 }
 
-self.addEventListener("fetch", (event) => {
-  event.respondWith(
+// Explicitly typing `self` as `ServiceWorkerGlobalScope`
+self.addEventListener("fetch", (event: Event) => {
+  const fetchEvent = event as FetchEvent; // Explicitly cast event to `FetchEvent`
+  fetchEvent.respondWith(
     isOnline
-      ? fetchAndCache(event.request).catch(() => getOfflineResponse(event.request))
-      : getOfflineResponse(event.request)
+      ? fetchAndCache(fetchEvent.request).catch(() => getOfflineResponse(fetchEvent.request))
+      : getOfflineResponse(fetchEvent.request)
   );
 });
 
-self.addEventListener("message", async (event) => {
-  const { type } = event.data;
+self.addEventListener("message", async (event: MessageEvent) => {
+  const { type } = event.data as { type: "online" | "offline" };
 
   if (type === "online") {
     isOnline = true;
