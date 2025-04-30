@@ -1,13 +1,18 @@
-import './style.css'
+import "./style.css";
 
-const networkStatus = document.getElementById("network-status") as HTMLElement | null;
+const networkStatus = document.getElementById(
+  "network-status"
+) as HTMLElement | null;
 
+// load only in production environment
 // registering service worker
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker
     .register("/sw.js")
     .then(() => console.log("Service Worker registered."))
-    .catch((error) => console.error("Service Worker registration failed:", error));
+    .catch((error) =>
+      console.error("Service Worker registration failed:", error)
+    );
 }
 
 // Handle network status updates
@@ -43,4 +48,3 @@ function sendMsgToServiceWorker(msgType: "online" | "offline") {
     });
   }
 }
-

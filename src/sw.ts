@@ -11,7 +11,8 @@ let db: Promise<IDBDatabase> = new Promise((resolve, reject) => {
     db.createObjectStore(objStoreName, { keyPath: "id" });
   };
 
-  request.onsuccess = (e: Event) => resolve((e.target as IDBRequest).result as IDBDatabase);
+  request.onsuccess = (e: Event) =>
+    resolve((e.target as IDBRequest).result as IDBDatabase);
   request.onerror = (e: Event) => reject((e.target as IDBRequest).error);
 });
 
@@ -42,7 +43,11 @@ interface StoreContentParams {
   content: string;
 }
 
-async function storeContent({ id, content }: StoreContentParams): Promise<void> {
+// optimise by processing array in one transaction
+async function storeContent({
+  id,
+  content,
+}: StoreContentParams): Promise<void> {
   const dbInstance = await db.catch(() => null);
   if (!dbInstance) return;
 
@@ -61,7 +66,7 @@ function extractFilenameFromUrl(url: string): string | null {
   if (!url) return null;
   if (isRootPath(url)) return "index.html";
 
-  const regex = /https?:\/\/[^/]+\/(?:.*\/)?([^/?#]+\.[^/?#]+)(?:[?#].*)?$/;
+  const regex = /^https?:\/\/[^/]+\/(?:.*\/)?([^/?#]+\.[^/?#]+)(?:[?#].*)?$/;
   const match = url.match(regex);
   return match?.[1] ?? null;
 }
@@ -74,7 +79,7 @@ async function fetchAndCache(request: Request): Promise<Response> {
   if (fileName) {
     const cloned = response.clone();
     const content = await cloned.text();
-    await storeContent({ id: fileName, content });
+    await storeContent({ id: fileName, content: content });
   }
 
   return response;
@@ -87,7 +92,8 @@ async function getOfflineResponse(request: Request): Promise<Response> {
   if (!fileName) return new Response("Invalid URL", { status: 400 });
 
   const dbInstance = await db.catch(() => null);
-  if (!dbInstance) return new Response("Failed to connect to database", { status: 503 });
+  if (!dbInstance)
+    return new Response("Failed to connect to database", { status: 503 });
 
   const tx = dbInstance.transaction([objStoreName], "readonly");
   const store = tx.objectStore(objStoreName);
@@ -112,7 +118,9 @@ self.addEventListener("fetch", (event: Event) => {
   const fetchEvent = event as FetchEvent; // Explicitly cast event to `FetchEvent`
   fetchEvent.respondWith(
     isOnline
-      ? fetchAndCache(fetchEvent.request).catch(() => getOfflineResponse(fetchEvent.request))
+      ? fetchAndCache(fetchEvent.request).catch(() =>
+          getOfflineResponse(fetchEvent.request)
+        )
       : getOfflineResponse(fetchEvent.request)
   );
 });
